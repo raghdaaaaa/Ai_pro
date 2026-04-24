@@ -1,8 +1,3 @@
-# # Problem Definition and Search Algorithms for Mini Ludo
-
-
-
-# # Ludo Problem Definition
 # class LudoProblem:
 #     STEP_CHOICES = list(range(1, 11)) # Steps can be 1 to 10
 
@@ -30,7 +25,7 @@
 #         if piece_idx == -1:
 #             return new_state, False, False
 
-#         new_pos = new_state[self.player][piece_idx] + step
+#         new_pos = int(self.state[self.player][piece_idx] + step)
 #         new_state[self.player][piece_idx] = new_pos
 
 #         if new_pos < 52:
@@ -58,29 +53,34 @@
 
 # #  Evaluation
 # # ══════════════════════════════════════════════════════
-# # Score the board state from the given player's perspective
+# # AI Logic - Evaluation & Search Algorithms
+# # ══════════════════════════════════════════════════════
+
 # def evaluate(state, player): # Higher score means better for the player
 #     n     = len(state)
 #     score = 0.0
 
-#     for piece_idx in range(2): #
+#     for piece_idx in range(2):
 #         pos = state[player][piece_idx]
 
 #         if pos >= END:
-#             score += 10000 # Piece has reached the end
+#             score += 100.0 # Piece has reached the end (Top Priority)
 #             continue
 #         if pos == 0:
-#             score -= 1000 # Piece is still at home
+#             score -= 30.0 # Piece is still at home
 #             continue
 
-#         score += pos * 65 # Progress towards the end is good
+#         # Progress Score: The further along the track, the better
+#         score += pos * 0.5 
+        
 #         if pos > 50:  
-#             score += (pos - 50) * 100 # In home stretch is very good
+#             score += (pos - 50) * 1.5 # In home stretch is very good
 
 #         cell = ring_pos_to_cell(player, pos)
 #         if cell in SAFE_SPOTS: # Safe spots are good for defense
-#             score += 200
+#             score += 2.0
 
+#         # (Opponent can capture us)
 #         if cell not in SAFE_SPOTS: 
 #             for opp in range(n):
 #                 if opp == player: continue
@@ -91,9 +91,10 @@
 #                             if opp_pos + step <= END:
 #                                 opp_cell = ring_pos_to_cell(opp, opp_pos + step)
 #                                 if opp_cell == cell:
-#                                     score -= 1500 # Opponent can capture us next turn
+#                                     score -= 15.0 
 #                                     break
 
+#         # We can capture an opponent on this cell
 #         if pos < 52 and cell not in SAFE_SPOTS:
 #             for opp in range(n):
 #                 if opp == player: continue
@@ -101,37 +102,36 @@
 #                     opp_pos = state[opp][opp_idx]
 #                     if 0 < opp_pos < 52:
 #                         if ring_pos_to_cell(opp, opp_pos) == cell:
-#                             score += 2000 # We can capture an opponent on this cell
+#                             score += 20.0 
 
+#     # Endgame Penalty: Opponents close to winning should reduce our score
 #     for opp in range(n):
 #         if opp == player: continue
 #         for piece_idx in range(2):
 #             opp_pos = state[opp][piece_idx]
 #             if opp_pos >= END:
-#                 score -= 10000
+#                 score -= 100.0
 #             elif opp_pos > 0:
-#                 score -= opp_pos * 50 # Opponent's progress is bad for us
+#                 score -= opp_pos * 0.05 
 
 #     return score
 
 # #  Minimax Algorithm with Alpha-Beta Pruning
 # # ══════════════════════════════════════════════════════
-# # Search the game tree to find the best move using alpha-beta pruning
 # def minimax(state, player, depth, alpha, beta, is_maximizing, ai_player):
-#     n        = len(state)
-#     problem  = LudoProblem(state, player)
-#     terminal = problem.is_terminal()
+#     n         = len(state)
+#     problem   = LudoProblem(state, player)
+#     terminal  = problem.is_terminal()
     
-#     # Terminal state: return a large positive score if AI wins, large negative if AI loses
 #     if terminal is not None:
-#         return 100000 if terminal == ai_player else -100000
+#         return 1000.0 if terminal == ai_player else -1000.0
+    
 #     if depth == 0:
 #         return evaluate(state, ai_player) 
 
 #     actions = problem.actions()
 #     actions.sort(key=lambda x: x[1], reverse=True)
      
-#     # Maximizing player (AI) tries to maximize the score
 #     if is_maximizing:
 #         best = -float('inf')
 #         for piece_idx, step in actions:
@@ -155,11 +155,11 @@
 #             if beta <= alpha: break
 #         return best
 
-# # Find the best action for the AI by evaluating all possible moves
+# # Find the best action for the AI
 # def get_best_move(state, player, depth=3):
-#     n        = len(state)
-#     problem  = LudoProblem(state, player)
-#     actions  = problem.actions()
+#     n         = len(state)
+#     problem   = LudoProblem(state, player)
+#     actions   = problem.actions()
 #     best_score  = -float('inf')
 #     best_action = actions[0]
 #     action_log  = []
@@ -170,8 +170,11 @@
 #         next_maximizing = True   if extra_turn else False
 #         score = minimax(new_state, next_player, depth - 1,
 #                         -float('inf'), float('inf'), next_maximizing, player)
+        
+#         # Reward for capturing an opponent
 #         if captured:
-#             score += 2000
+#             score += 20.0
+            
 #         action_log.append((piece_idx, step, score))
 #         if score > best_score:
 #             best_score  = score
@@ -181,7 +184,6 @@
 
 # #  Greedy Algorithm 
 # # ══════════════════════════════════════════════════════
-# # Pick a move using simple priority rules (capture > win > biggest step)
 # def get_greedy_move(state, player):
 #     problem = LudoProblem(state, player)
 #     actions = problem.actions()
@@ -196,12 +198,11 @@
 
 #         if captured:
 #             capture_moves.append((piece_idx, step))
-#         elif pos + step == END:          # Winning move
+#         elif pos + step == END:
 #             win_moves.append((piece_idx, step))
 #         else:
 #             normal_moves.append((piece_idx, step))
 
-#     # Prioritize capture moves, then winning moves, then normal moves
 #     if capture_moves:
 #         pool = capture_moves
 #     elif win_moves:
